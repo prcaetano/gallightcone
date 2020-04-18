@@ -10,13 +10,8 @@ from camb import model, initialpower
 from astropy.io import fits
 import configparser
 
-#root        = str(sys.argv[1]) # directory of where out_%dp.list.gcat files are
-#file_alist  = str(sys.argv[2]) # file containing all the scale factors
-#shellwidth  = int(sys.argv[4]) # Width of shell in Mpc/h
-#galtype     = int(sys.argv[5]) # type of galaxy 1=LRG,2=QSO,3=ELG 
-#boxL        = int(sys.argv[6]) # size of box in Mpc/h
-#configfile = str(sys.argv[1]) # config file
-#shellnum   = int(sys.argv[2]) # Shell index
+configfile = str(sys.argv[1]) # config file
+shellnum   = int(sys.argv[2]) # Shell index
 
 config     = configparser.ConfigParser()
 config.read(configfile)
