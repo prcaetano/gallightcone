@@ -10,7 +10,7 @@
 
 # gallightcone
 
-This is a simple code to generate a lightcone from a N-body simulation box.
+This is a simple code to generate a lightcone from Shadab's HOD output.
 
 To run this code use:
 
