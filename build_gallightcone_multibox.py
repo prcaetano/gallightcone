@@ -8,6 +8,7 @@ import healpy as hp
 import numexpr as ne
 from camb import model, initialpower
 from astropy.io import fits
+import configparser
 
 #root        = str(sys.argv[1]) # directory of where out_%dp.list.gcat files are
 #file_alist  = str(sys.argv[2]) # file containing all the scale factors
