@@ -1,6 +1,6 @@
 # gallightcone
 
-This code is a simple code to generate a lightcone from a simulation box.
+This is a simple code to generate a lightcone from a N-body simulation box.
 
 To run this code use:
 
@@ -27,3 +27,5 @@ X is the shell number (0 being z=0)
 e.g. if you define shellwidth = 25 in the config file and choose X=1 then you are selecting the shell between 25-50 Mpc/h 
 
 The code will output galaxy catalogs in each shell, which you will have to combine.
+
+If you have questions or comments please email yomori@stanford.edu
