@@ -1,13 +1,12 @@
-Requirements
-------------
+# Requirements
 
-* `Python <http://www.python.org>`_ 3.5, or 3.6
+* [Python](http://www.python.org) 3.5 or 3.6
 
-* `Astropy <http://www.astropy.org>`_
+* [Astropy](http://www.astropy.org)
 
-* `configparser <https://docs.python.org/3/library/configparser.html>`_
+* [configparser](https://docs.python.org/3/library/configparser.html)
 
-* `CAMB <https://camb.readthedocs.io/en/latest/>`_
+* [CAMB](https://camb.readthedocs.io/en/latest/)
 
 # gallightcone
 
