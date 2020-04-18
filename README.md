@@ -1,3 +1,14 @@
+Requirements
+------------
+
+* `Python <http://www.python.org>`_ 3.5, or 3.6
+
+* `Astropy <http://www.astropy.org>`_
+
+* `configparser <https://docs.python.org/3/library/configparser.html>`_
+
+* `CAMB <https://camb.readthedocs.io/en/latest/>`_
+
 # gallightcone
 
 This is a simple code to generate a lightcone from a N-body simulation box.
