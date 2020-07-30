@@ -13,12 +13,16 @@ from camb import model, initialpower
 from astropy.io import fits
 import configparser
 import argparse
+from schwimmbad.mpi import MPIPool
+from itertools import product
 
 parser = argparse.ArgumentParser()
 parser.add_argument("config", help="ini file holding configuration",
                     type=str)
 parser.add_argument("--dir_out", type=str, help="output directory (overrides config file)")
 parser.add_argument("--dir_gcat", type=str, help="input directory (same)")
+parser.add_argument("--name_template", type=str, help="template for name of catalogs (same)")
+parser.add_argument("--shellnums", type=str, help="list of comma separated shell numbers to compute (same)")
 args = parser.parse_args()
 
 
@@ -27,18 +31,29 @@ configfile = str(args.config) # config file
 config     = configparser.ConfigParser()
 config.read(configfile)
 
-dir_out        = args.dir_out
-dir_gcat       = args.dir_gcat
+dir_out           = args.dir_out
+dir_gcat          = args.dir_gcat
+name_template     = args.name_template
+shellnums         = args.shellnums
 if dir_out is None:
-    dir_out    =  config.get('dir','dir_out')
+    dir_out       =  config.get('dir','dir_out')
 if dir_gcat is None:
-    dir_gcat   =  config.get('dir','dir_gcat')
+    dir_gcat      =  config.get('dir','dir_gcat')
+if name_template is None:
+    name_template =  config.get('dir','name_template')
+if shellnums is None:
+    try:
+        shellnums = config.get('sim', 'shellnums')
+    except:
+        shellnums = None
+
 file_alist     =  config.get('dir','file_alist')
 file_camb      =  config.get('dir','file_camb')
 boxL           =  config.getint('sim','boxL')
 shellwidth     =  config.getint('sim','shellwidth')
-zmin           =  config.getfloat('sim', 'zmin')
-zmax           =  config.getfloat('sim', 'zmax')
+if shellnums is None:
+    zmin       =  config.getfloat('sim', 'zmin')
+    zmax       =  config.getfloat('sim', 'zmax')
 alist          = np.loadtxt(file_alist)
 
 zlist   = 1/alist[:,1]-1.
@@ -80,6 +95,105 @@ def getnearestsnap(alist,zmid):
     return alist[np.argmin(np.abs(zsnap-zmid)),0]
 
 
+def generate_lightcone_shell(args):
+    """ Generates and saves a single lightcone shell """
+    galtype, shellnum = args
+
+    out_file = dir_out+'lightcone_multibox_galtype%d_%d.fits'%(galtype,shellnum)
+    if os.path.isfile(out_file):
+        return
+
+    preffix = f"[shellnum={shellnum},galtype={galtype}] "
+
+    chilow = shellwidth*(shellnum+0)
+    chiupp = shellwidth*(shellnum+1)
+    chimid = 0.5*(chilow+chiupp)
+    ntiles = int(np.ceil(chiupp/boxL))
+    print(preffix + "tiling [%dx%dx%d]"%(2*ntiles,2*ntiles,2*ntiles))
+    zmid   = results.redshift_at_comoving_radial_distance(chimid/h)
+    print(preffix + 'Generating map for halos in the range [%3.f - %.3f Mpc/h]'%(chilow,chiupp))
+
+    nearestsnap = getnearestsnap(alist,zmid)
+    print(preffix + 'The scalefactor closest to the middle of the shell is [%.6f]'%(nearestsnap))
+
+    #--------------Loading the binary data file------------------------
+    try:
+        in_file = dir_gcat+name_template.format(int(nearestsnap))
+        d     = np.loadtxt(in_file)
+    except IOError:
+        print(preffix + f"WARNING: Couldn't open {in_file} for galtype {galtype}, shellnum {shellnum}.",
+              file=sys.stderr)
+        return
+    gtype = d[:,9]
+    idx   = np.where(gtype==galtype)[0] #only selecting certain galaxies
+    ngalbox=len(idx)
+    px    = d[idx,0]
+    py    = d[idx,1]
+    pz    = d[idx,2]
+    vx    = d[idx,3]
+    vy    = d[idx,4]
+    vz    = d[idx,5]
+    print(preffix + "using %d halos"%len(idx))
+    del d
+    #-------------------------------------------------------------------
+
+    totra   = np.array([])
+    totdec  = np.array([])
+    totz    = np.array([])
+    totm    = np.array([])
+    totdz   = np.array([])
+    totvlos = np.array([])
+
+    for xx in range(-ntiles,ntiles):
+        for yy in range(-ntiles,ntiles):
+            for zz in range(-ntiles,ntiles):
+
+                slicehit = checkslicehit(chilow,chiupp,xx,yy,zz)             # Check if box intersects with shell
+
+                if slicehit==True:
+
+                    sx  = ne.evaluate("px -%d + boxL * xx"%origin[0])
+                    sy  = ne.evaluate("py -%d + boxL * yy"%origin[1])
+                    sz  = ne.evaluate("pz -%d + boxL * zz"%origin[2])
+                    r   = ne.evaluate("sqrt(sx*sx + sy*sy + sz*sz)")
+                    zi  = results.redshift_at_comoving_radial_distance(r/h) # interpolated distance from position
+                    idx = np.where((r>chilow) & (r<chiupp))[0]              # only select halos that are within the shell
+
+                    if idx.size!=0:
+                        ux=sx[idx]/r[idx]
+                        uy=sy[idx]/r[idx]
+                        uz=sz[idx]/r[idx]
+                        qx=vx[idx]*1000.
+                        qy=vy[idx]*1000.
+                        qz=vz[idx]*1000.
+                        zp=zi[idx]
+                        tht,phi = hp.vec2ang(np.c_[ux,uy,uz])
+                        ra,dec  = tp2rd(tht,phi)
+                        vlos    = ne.evaluate("qx*ux + qy*uy + qz*uz")
+                        dz      = ne.evaluate("(vlos/clight)*(1+zp)")
+
+                        totra   = np.append(totra,ra)
+                        totdec  = np.append(totdec,dec)
+                        totz    = np.append(totz,zp)
+                        totdz   = np.append(totdz,dz)
+                        totvlos = np.append(totvlos,vlos/1000.) # to convert back to km/s
+
+    # Writing out the output fits file
+    c1 = fits.Column(name='RA'     , array=totra    , format='E')
+    c2 = fits.Column(name='DEC'    , array=totdec   , format='E')
+    c3 = fits.Column(name='Z'      , array=totz     , format='D')
+    c4 = fits.Column(name='DZ'     , array=totdz    , format='E')
+    c5 = fits.Column(name='VEL_LOS', array=totvlos  , format='E')
+
+    hdu             = fits.BinTableHDU.from_columns([c1, c2, c3,c4,c5])
+    hdr             = fits.Header()
+    hdr['NGALBOX']  = ngalbox # total number defined as length of ra array
+    primary_hdu     = fits.PrimaryHDU(header=hdr)
+    hdul            = fits.HDUList([primary_hdu, hdu])
+
+    hdul.writeto(out_file, overwrite=True)
+
+
 #-------- Running camb to get comoving distances -----------
 #Load all parameters from camb file 
 pars = camb.read_ini(file_camb)
@@ -90,101 +204,24 @@ pars.NonLinearModel.set_params(halofit_version='takahashi')
 camb.set_feedback_level(level=100)
 results   = camb.get_results(pars)
 
-shellnum_min = int(results.comoving_radial_distance(zmin)*h // shellwidth)
-shellnum_max = int(results.comoving_radial_distance(zmax)*h // shellwidth + 1)
+if shellnums is None:
+    shellnum_min = int(results.comoving_radial_distance(zmin)*h // shellwidth)
+    shellnum_max = int(results.comoving_radial_distance(zmax)*h // shellwidth + 1)
+    shellnums = list(range(shellnum_min, shellnum_max+1))
+else:
+    shellnums = list(map(int, shellnums.split(",")))
 
+try:
+    pool = MPIPool()
+except:
+    pool = None
 
-for galtype in [1, 2, 3]:
-    for shellnum in range(shellnum_min, shellnum_max+1):
-        out_file = dir_out+'lightcone_multibox_galtype%d_%d.fits'%(galtype,shellnum)
-        if os.path.isfile(out_file):
-            continue
+if pool is not None:
+    if not pool.is_master():
+        pool.wait()
+        sys.exit(0)
+    pool.map(generate_lightcone_shell, product([1, 2, 3], shellnums))
+else:
+    map(generate_lightcone_shell, product([1, 2, 3], shellnums))
 
-        chilow = shellwidth*(shellnum+0)
-        chiupp = shellwidth*(shellnum+1)
-        chimid = 0.5*(chilow+chiupp)
-        ntiles = int(np.ceil(chiupp/boxL))
-        print("tiling [%dx%dx%d]"%(2*ntiles,2*ntiles,2*ntiles))
-        zmid   = results.redshift_at_comoving_radial_distance(chimid/h)
-        print('Generating map for halos in the range [%3.f - %.3f Mpc/h]'%(chilow,chiupp))
-
-        nearestsnap = getnearestsnap(alist,zmid)
-        print('The scalefactor closest to the middle of the shell is [%.6f]'%(nearestsnap))
-
-        #--------------Loading the binary data file------------------------
-        try:
-            in_file = dir_gcat+'/out_%dp.list.gcat'%nearestsnap
-            d     = np.loadtxt(in_file)
-        except IOError:
-            print(f"WARNING: Couldn't open {in_file} for galtype {galtype}, shellnum {shellnum}.",
-                  file=sys.stderr)
-            continue
-        gtype = d[:,9]
-        idx   = np.where(gtype==galtype)[0] #only selecting certain galaxies
-        ngalbox=len(idx)
-        px    = d[idx,0]
-        py    = d[idx,1]
-        pz    = d[idx,2]
-        vx    = d[idx,3]
-        vy    = d[idx,4]
-        vz    = d[idx,5]
-        print("using %d halos"%len(idx))
-        del d
-        #-------------------------------------------------------------------
-
-        totra   = np.array([])
-        totdec  = np.array([])
-        totz    = np.array([])
-        totm    = np.array([])
-        totdz   = np.array([])
-        totvlos = np.array([])
-
-        for xx in range(-ntiles,ntiles):
-            for yy in range(-ntiles,ntiles):
-                for zz in range(-ntiles,ntiles):
-
-                    slicehit = checkslicehit(chilow,chiupp,xx,yy,zz)             # Check if box intersects with shell
-
-                    if slicehit==True:
-
-                        sx  = ne.evaluate("px -%d + boxL * xx"%origin[0])
-                        sy  = ne.evaluate("py -%d + boxL * yy"%origin[1])
-                        sz  = ne.evaluate("pz -%d + boxL * zz"%origin[2])
-                        r   = ne.evaluate("sqrt(sx*sx + sy*sy + sz*sz)")
-                        zi  = results.redshift_at_comoving_radial_distance(r/h) # interpolated distance from position
-                        idx = np.where((r>chilow) & (r<chiupp))[0]              # only select halos that are within the shell
-
-                        if idx.size!=0:
-                            ux=sx[idx]/r[idx]
-                            uy=sy[idx]/r[idx]
-                            uz=sz[idx]/r[idx]
-                            qx=vx[idx]*1000.
-                            qy=vy[idx]*1000.
-                            qz=vz[idx]*1000.
-                            zp=zi[idx]
-                            tht,phi = hp.vec2ang(np.c_[ux,uy,uz])
-                            ra,dec  = tp2rd(tht,phi)
-                            vlos    = ne.evaluate("qx*ux + qy*uy + qz*uz")
-                            dz      = ne.evaluate("(vlos/clight)*(1+zp)")
-
-                            totra   = np.append(totra,ra)
-                            totdec  = np.append(totdec,dec)
-                            totz    = np.append(totz,zp)
-                            totdz   = np.append(totdz,dz)
-                            totvlos = np.append(totvlos,vlos/1000.) # to convert back to km/s
-
-        # Writing out the output fits file
-        c1 = fits.Column(name='RA'     , array=totra    , format='E')
-        c2 = fits.Column(name='DEC'    , array=totdec   , format='E')
-        c3 = fits.Column(name='Z'      , array=totz     , format='D')
-        c4 = fits.Column(name='DZ'     , array=totdz    , format='E')
-        c5 = fits.Column(name='VEL_LOS', array=totvlos  , format='E')
-
-        hdu             = fits.BinTableHDU.from_columns([c1, c2, c3,c4,c5])
-        hdr             = fits.Header()
-        hdr['NGALBOX']  = ngalbox # total number defined as length of ra array
-        primary_hdu     = fits.PrimaryHDU(header=hdr)
-        hdul            = fits.HDUList([primary_hdu, hdu])
-
-        hdul.writeto(out_file, overwrite=True)
 

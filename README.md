@@ -8,6 +8,8 @@
 
 * [CAMB](https://camb.readthedocs.io/en/latest/)
 
+* [schwimmbad](https://schwimmbad.readthedocs.io/en/latest/)
+
 # gallightcone
 
 This is a simple code to generate a lightcone from Shadab's HOD output.
@@ -15,9 +17,9 @@ This is a simple code to generate a lightcone from Shadab's HOD output.
 To run this code use:
 
 ```python 
-python build_gallightcone_multibox.py configfile X
+python build_gallightcone_multibox.py configfile.ini
 ```
-configfile will look like (see test.config for an example):
+configfile.ini will look like (see test.config for an example):
 ```
 [dir]
 dir_out     Output directory
@@ -28,13 +30,13 @@ file_camb   CAMB configuration file
 [sim]
 boxL        Length of the simulation box [Mpc/h]
 shellwidth  Width of shell [Mpc/h]
-
-[sample]
-galtype     Type of galaxy used - 1=LRG,2=QSO,3=ELG 
+zmin        Minimum of redshift range to use
+zmax        Maximum of redshift range
+shellnums   Comma-separated list of numbers (if provided, ignores the redshift range specified above)
 ```
 
-X is the shell number (0 being z=0)
-e.g. if you define shellwidth = 25 in the config file and choose X=1 then you are selecting the shell between 25-50 Mpc/h 
+The shell number are counted from z=0 (0 being z=0)
+e.g. if you define shellwidth = 25 in the config file and choose shellnums=1 then you are selecting the shell between 25-50 Mpc/h 
 
 The code will output galaxy catalogs in each shell, which you will have to combine.
 
