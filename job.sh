@@ -18,5 +18,8 @@ mydesienv 19.12
 
 conda activate lightcone 
 
-srun --cpu-bind=cores build_gallightcone_multibox.py config.ini
+export DIR_OUT=/global/cscratch1/sd/prc/data/mock_challenge/lightcones/v2/
+export DIR_GCAT=/global/cfs/cdirs/desi/cosmosim/UNITSIM/fixedAmp_001_lowres/Gcat-wpmax-v3/
+
+srun --cpu-bind=cores build_gallightcone_multibox.py --dir_out ${DIR_OUT} --dir_gcat ${DIR_GCAT} config.ini
 
