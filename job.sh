@@ -10,7 +10,7 @@
 #SBATCH --mail-type=begin,end,fail
 #SBATCH --mail-user=pcaetano@ifi.unicamp.br
 #SBATCH --account=desi
-#SBATCH --job-name=lightcones_v3
+#SBATCH --job-name=lightcones
 
 . $HOME/.bashrc
 mydesienv 19.12

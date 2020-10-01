@@ -17,15 +17,16 @@ This is a simple code to generate a lightcone from Shadab's HOD output.
 To run this code use:
 
 ```python 
-python build_gallightcone_multibox.py configfile.ini
+python build_gallightcone_multibox.py config.ini
 ```
-configfile.ini will look like (see test.config for an example):
+The relevant section of config.ini will look like (see config.ini for an example):
 ```
 [dir]
-dir_out     Output directory
-dir_gcat    Directory where the input out_*p.list.gcat files are located
-file_alist  File containing list of simulation scale factors
-file_camb   CAMB configuration file
+dir_out        Output directory
+dir_gcat       Directory where the input out_*p.list.gcat files are located
+name_template  Python template string describing names of input files
+file_alist     File containing list of simulation scale factors
+file_camb      CAMB configuration file
 
 [sim]
 boxL        Length of the simulation box [Mpc/h]
@@ -41,3 +42,4 @@ e.g. if you define shellwidth = 25 in the config file and choose shellnums=1 the
 The code will output galaxy catalogs in each shell, which you will have to combine.
 
 If you have questions or comments please email yomori@stanford.edu
+

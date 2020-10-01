@@ -1,0 +1,5 @@
+export LIGHTCONE_CODE_DIR=$HOME/code/gallightcone
+export POSTPROCESS_CODE_DIR=$HOME/code/apply_desifootprint_nz
+
+export PATH=$PATH:$LIGHTCONE_CODE_DIR:$POSTPROCESS_CODE_DIR
+
